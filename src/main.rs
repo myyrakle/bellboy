@@ -11,7 +11,7 @@ use kube::{
     Api, Client,
     runtime::{WatchStreamExt, watcher},
 };
-use notifier::{notify, NotifierConfig};
+use notifier::{NotifierConfig, notify};
 use state::StateManager;
 
 fn setup_logging() {
