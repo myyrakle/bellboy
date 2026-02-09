@@ -65,20 +65,34 @@ pub async fn detect_changes(
             current.last_scaled_replicas = current.replicas;
         }
         Some(prev) => {
+            // replica 변경 여부 확인
+            let is_replica_change = current.replicas != prev.replicas;
+            // 스케일링 진행 중인지 확인 (아직 완료되지 않은 replica 변경)
+            let is_scaling_in_progress = current.replicas != current.last_scaled_replicas;
+
             // 1. Deployment spec 변경 감지 (generation 증가)
             if current.generation > prev.generation {
-                events.push(DeploymentEvent::DeploymentStarted {
-                    namespace: namespace.clone(),
-                    name: name.clone(),
-                    old_generation: prev.generation,
-                    new_generation: current.generation,
-                });
+                if is_replica_change {
+                    // replica 변경과 함께 generation 증가 → 스케일 이벤트로만 처리
+                    // generation은 증가했지만 배포 이벤트는 발생시키지 않으므로
+                    // 이 generation을 "완료된 것"으로 표시하여 배포 완료 알림 방지
+                    current.last_completed_generation = current.generation;
+                } else {
+                    // replica 변경 없이 generation 증가 → 배포 이벤트
+                    events.push(DeploymentEvent::DeploymentStarted {
+                        namespace: namespace.clone(),
+                        name: name.clone(),
+                        old_generation: prev.generation,
+                        new_generation: current.generation,
+                    });
+                }
             }
 
             // 2. Deployment 완료 확인
-            // 배포가 완료되었고, 이 generation에 대해 아직 완료 이벤트를 발생시키지 않은 경우
+            // 스케일링이 진행 중이 아니고, 아직 완료 이벤트를 발생시키지 않은 경우만
             if is_deployment_complete(&current)
                 && current.generation > current.last_completed_generation
+                && !is_scaling_in_progress
             {
                 events.push(DeploymentEvent::DeploymentCompleted {
                     namespace: namespace.clone(),
@@ -91,7 +105,7 @@ pub async fn detect_changes(
             }
 
             // 3. Replica 수 변경 감지
-            if current.replicas != prev.replicas {
+            if is_replica_change {
                 events.push(DeploymentEvent::ReplicaScaleStarted {
                     namespace: namespace.clone(),
                     name: name.clone(),
