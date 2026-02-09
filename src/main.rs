@@ -1,9 +1,16 @@
+mod detector;
+mod notifier;
+mod state;
+
+use detector::detect_changes;
 use futures::TryStreamExt;
 use k8s_openapi::api::apps::v1::Deployment;
 use kube::{
+    runtime::{watcher, WatchStreamExt},
     Api, Client,
-    runtime::{WatchStreamExt, watcher},
 };
+use notifier::notify;
+use state::StateManager;
 
 #[tokio::main]
 async fn main() {
@@ -12,22 +19,21 @@ async fn main() {
         .expect("Failed to create client");
 
     let deployments: Api<Deployment> = Api::all(client);
+    let state_manager = StateManager::new();
 
     watcher(deployments, Default::default())
         .applied_objects()
-        .try_for_each(|deployment| async move {
-            // 이미지 변경, replica 변경 감지 후 알림
-            println!(
-                "Deployment applied: {} with {} replicas",
-                deployment.metadata.name.unwrap_or_default(),
-                deployment
-                    .spec
-                    .as_ref()
-                    .and_then(|spec| spec.replicas)
-                    .unwrap_or(0)
-            );
+        .try_for_each(|deployment| {
+            let state_manager = state_manager.clone();
+            async move {
+                let events = detect_changes(&deployment, &state_manager).await;
 
-            Ok(())
+                for event in events {
+                    notify(event);
+                }
+
+                Ok(())
+            }
         })
         .await
         .expect("watch failed");
