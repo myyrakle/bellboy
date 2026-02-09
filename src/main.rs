@@ -11,7 +11,7 @@ use kube::{
     Api, Client,
     runtime::{WatchStreamExt, watcher},
 };
-use notifier::notify;
+use notifier::{notify, NotifierConfig};
 use state::StateManager;
 
 fn setup_logging() {
@@ -33,16 +33,26 @@ async fn main() {
 
     let deployments: Api<Deployment> = Api::all(client);
     let state_manager = StateManager::new();
+    let notifier_config = NotifierConfig::from_env();
+
+    // Slack 설정 확인 및 로깅
+    if notifier_config.has_slack_config() {
+        log::info!("Slack notification enabled");
+        log::info!("Language: {:?}", notifier_config.language);
+    } else {
+        log::info!("Slack notification disabled (set SLACK_TOKEN and SLACK_CHANNEL to enable)");
+    }
 
     watcher(deployments, Default::default())
         .applied_objects()
         .try_for_each(|deployment| {
             let state_manager = state_manager.clone();
+            let notifier_config = notifier_config.clone();
             async move {
                 let events = detect_changes(&deployment, &state_manager).await;
 
                 for event in events {
-                    notify(event);
+                    notify(event, &notifier_config).await;
                 }
 
                 Ok(())

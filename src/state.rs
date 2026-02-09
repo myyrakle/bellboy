@@ -4,7 +4,9 @@ use tokio::sync::Mutex;
 
 #[derive(Clone, Debug)]
 pub struct DeploymentState {
+    #[allow(unused)]
     pub namespace: String,
+    #[allow(unused)]
     pub name: String,
     pub generation: i64,
     pub replicas: i32,
