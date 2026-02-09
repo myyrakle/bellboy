@@ -17,3 +17,7 @@ It can be installed via helm.
 helm repo add bellboy https://myyrakle.github.io/bellboy/
 helm install bellboy bellboy/bellboy --set slack.token="SLACK TOKEN" --set slack.channel="CHANNEL ID"
 ```
+
+Then, whenever the Deployment changes, a message like the following will be sent:
+<img width="485" height="214" alt="image" src="https://github.com/user-attachments/assets/6a50573c-3270-4096-9b41-d446405b5297" />
+
