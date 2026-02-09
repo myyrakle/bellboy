@@ -60,6 +60,9 @@ pub async fn detect_changes(
     match previous {
         None => {
             // 처음 발견한 Deployment - 상태만 저장하고 이벤트 발생 안 함
+            // 초기 상태를 현재 값으로 설정하여 잘못된 완료 알림 방지
+            current.last_completed_generation = current.generation;
+            current.last_scaled_replicas = current.replicas;
         }
         Some(prev) => {
             // 1. Deployment spec 변경 감지 (generation 증가)
