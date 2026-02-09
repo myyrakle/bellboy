@@ -1,0 +1,21 @@
+apiVersion: v1
+entries:
+  bellboy:
+  - apiVersion: v2
+    appVersion: 0.1.0
+    created: "2026-02-10T03:14:01.991539552+09:00"
+    description: Kubernetes Deployment monitor with Slack notifications
+    digest: 8a2a786f85642f4975f5666658664d703181c621aa1cc15fe3372cd71754c112
+    keywords:
+    - kubernetes
+    - deployment
+    - monitoring
+    - slack
+    maintainers:
+    - name: myyrakle
+    name: bellboy
+    type: application
+    urls:
+    - https://myyrakle.github.io/bellboy/bellboy-0.1.0.tgz
+    version: 0.1.0
+generated: "2026-02-10T03:14:01.991246094+09:00"

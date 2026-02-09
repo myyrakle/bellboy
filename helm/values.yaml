@@ -1,0 +1,33 @@
+# Default values for bellboy
+
+image:
+  repository: myyrakle/bellboy
+  tag: v0.1.0
+  pullPolicy: IfNotPresent
+
+# Slack 설정
+slack:
+  token: ""  # 필수: Slack Bot Token
+  channel: ""  # 필수: Slack Channel ID
+
+# 언어 설정 (ko 또는 en)
+language: ko
+
+# 로그 레벨
+logLevel: info
+
+# 리소스 제한
+resources:
+  requests:
+    memory: "64Mi"
+    cpu: "100m"
+  limits:
+    memory: "128Mi"
+    cpu: "200m"
+
+# ServiceAccount 이름
+serviceAccount:
+  name: bellboy
+
+# Namespace
+namespace: default

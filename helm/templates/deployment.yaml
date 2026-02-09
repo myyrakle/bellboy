@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "bellboy.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "bellboy.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: Recreate # 동시에 2개가 뜨지 않도록 보장
+  selector:
+    matchLabels:
+      {{- include "bellboy.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "bellboy.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: SLACK_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "bellboy.fullname" . }}-secrets
+                  key: slack-token
+            - name: SLACK_CHANNEL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "bellboy.fullname" . }}-secrets
+                  key: slack-channel
+            - name: LANGUAGE
+              value: {{ .Values.language | quote }}
+            - name: RUST_LOG
+              value: {{ .Values.logLevel | quote }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

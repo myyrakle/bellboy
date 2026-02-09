@@ -1,0 +1,26 @@
+Thank you for installing {{ .Chart.Name }}!
+
+Your release is named {{ .Release.Name }}.
+
+Bellboy is now monitoring Kubernetes deployments across all namespaces and will send notifications to your Slack channel.
+
+Configuration:
+- Namespace: {{ .Values.namespace }}
+- Slack Channel: {{ .Values.slack.channel }}
+- Language: {{ .Values.language }}
+- Log Level: {{ .Values.logLevel }}
+
+To verify the installation:
+
+  kubectl get deployment {{ include "bellboy.fullname" . }} -n {{ .Values.namespace }}
+  kubectl logs -f deployment/{{ include "bellboy.fullname" . }} -n {{ .Values.namespace }}
+
+To update Slack credentials:
+
+  helm upgrade {{ .Release.Name }} ./helm/bellboy \
+    --set slack.token=YOUR_SLACK_TOKEN \
+    --set slack.channel=YOUR_SLACK_CHANNEL
+
+To uninstall:
+
+  helm uninstall {{ .Release.Name }}
