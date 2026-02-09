@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bellboy
+  namespace: default
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # 동시에 2개가 뜨지 않도록 보장
+  selector:
+    matchLabels:
+      app: bellboy
+  template:
+    metadata:
+      labels:
+        app: bellboy
+    spec:
+      serviceAccountName: bellboy
+      containers:
+        - name: bellboy
+          image: myyrakle/bellboy:v0.1.0 # 실제 이미지 경로로 변경 필요
+          env:
+            - name: SLACK_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: bellboy-secrets
+                  key: slack-token
+            - name: SLACK_CHANNEL
+              valueFrom:
+                secretKeyRef:
+                  name: bellboy-secrets
+                  key: slack-channel
+            - name: LANGUAGE
+              value: "ko"
+            - name: RUST_LOG
+              value: "info"
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
