@@ -31,7 +31,17 @@ async fn main() {
         .await
         .expect("Failed to create client");
 
-    let deployments: Api<Deployment> = Api::all(client);
+    // NAMESPACE 환경 변수로 특정 네임스페이스만 watch 가능
+    let deployments: Api<Deployment> = match env::var("NAMESPACE") {
+        Ok(namespace) => {
+            log::info!("Watching namespace: {}", namespace);
+            Api::namespaced(client, &namespace)
+        }
+        Err(_) => {
+            log::info!("Watching all namespaces");
+            Api::all(client)
+        }
+    };
     let state_manager = StateManager::new();
     let notifier_config = NotifierConfig::from_env();
 
