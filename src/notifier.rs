@@ -53,12 +53,18 @@ fn format_message(event: &DeploymentEvent, language: Language) -> String {
                 name,
                 old_generation,
                 new_generation,
+                old_replicas,
+                new_replicas,
             },
             Language::Korean,
         ) => {
+            let replica_info = match (old_replicas, new_replicas) {
+                (Some(old), Some(new)) => format!(" (replicas: {} → {})", old, new),
+                _ => String::new(),
+            };
             format!(
-                "🚀 [배포 시작] {}/{}: 배포가 시작됩니다 (revision: {} -> {})",
-                namespace, name, old_generation, new_generation
+                "🚀 [배포 시작] {}/{}: 배포가 시작됩니다 (revision: {} -> {}){}",
+                namespace, name, old_generation, new_generation, replica_info
             )
         }
         (
@@ -67,12 +73,18 @@ fn format_message(event: &DeploymentEvent, language: Language) -> String {
                 name,
                 old_generation,
                 new_generation,
+                old_replicas,
+                new_replicas,
             },
             Language::English,
         ) => {
+            let replica_info = match (old_replicas, new_replicas) {
+                (Some(old), Some(new)) => format!(" (replicas: {} → {})", old, new),
+                _ => String::new(),
+            };
             format!(
-                "🚀 [Deploy Started] {}/{}: Deployment started (revision: {} -> {})",
-                namespace, name, old_generation, new_generation
+                "🚀 [Deploy Started] {}/{}: Deployment started (revision: {} -> {}){}",
+                namespace, name, old_generation, new_generation, replica_info
             )
         }
 
@@ -82,12 +94,17 @@ fn format_message(event: &DeploymentEvent, language: Language) -> String {
                 name,
                 generation,
                 replicas,
+                replica_changed,
             },
             Language::Korean,
         ) => {
+            let replica_info = match replica_changed {
+                Some((old, new)) => format!("replicas: {} → {}", old, new),
+                None => format!("replicas: {}", replicas),
+            };
             format!(
-                "✅ [배포 완료] {}/{}: 배포가 완료되었습니다 (revision: {}, replicas: {})",
-                namespace, name, generation, replicas
+                "✅ [배포 완료] {}/{}: 배포가 완료되었습니다 (revision: {}, {})",
+                namespace, name, generation, replica_info
             )
         }
         (
@@ -96,12 +113,17 @@ fn format_message(event: &DeploymentEvent, language: Language) -> String {
                 name,
                 generation,
                 replicas,
+                replica_changed,
             },
             Language::English,
         ) => {
+            let replica_info = match replica_changed {
+                Some((old, new)) => format!("replicas: {} → {}", old, new),
+                None => format!("replicas: {}", replicas),
+            };
             format!(
-                "✅ [Deploy Completed] {}/{}: Deployment completed (revision: {}, replicas: {})",
-                namespace, name, generation, replicas
+                "✅ [Deploy Completed] {}/{}: Deployment completed (revision: {}, {})",
+                namespace, name, generation, replica_info
             )
         }
 
@@ -216,12 +238,14 @@ fn create_slack_attachment(event: &DeploymentEvent, language: Language) -> Slack
             name,
             old_generation,
             new_generation,
+            old_replicas,
+            new_replicas,
         } => {
             let title = match language {
                 Language::Korean => "🚀 배포 시작",
                 Language::English => "🚀 Deploy Started",
             };
-            let fields = vec![
+            let mut fields = vec![
                 SlackField {
                     title: "Deployment".to_string(),
                     value: format!("{}/{}", namespace, name),
@@ -233,6 +257,15 @@ fn create_slack_attachment(event: &DeploymentEvent, language: Language) -> Slack
                     short: true,
                 },
             ];
+
+            if let (Some(old), Some(new)) = (old_replicas, new_replicas) {
+                fields.push(SlackField {
+                    title: "Replicas".to_string(),
+                    value: format!("{} → {}", old, new),
+                    short: true,
+                });
+            }
+
             (title, fields)
         }
         DeploymentEvent::DeploymentCompleted {
@@ -240,10 +273,15 @@ fn create_slack_attachment(event: &DeploymentEvent, language: Language) -> Slack
             name,
             generation,
             replicas,
+            replica_changed,
         } => {
             let title = match language {
                 Language::Korean => "✅ 배포 완료",
                 Language::English => "✅ Deploy Completed",
+            };
+            let replica_value = match replica_changed {
+                Some((old, new)) => format!("{} → {}", old, new),
+                None => replicas.to_string(),
             };
             let fields = vec![
                 SlackField {
@@ -258,7 +296,7 @@ fn create_slack_attachment(event: &DeploymentEvent, language: Language) -> Slack
                 },
                 SlackField {
                     title: "Replicas".to_string(),
-                    value: replicas.to_string(),
+                    value: replica_value,
                     short: true,
                 },
             ];
