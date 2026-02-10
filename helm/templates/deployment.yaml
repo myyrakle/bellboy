@@ -35,6 +35,10 @@ spec:
                   key: slack-channel
             - name: LANGUAGE
               value: {{ .Values.language | quote }}
+            {{- if .Values.watchNamespace }}
+            - name: NAMESPACE
+              value: {{ .Values.watchNamespace | quote }}
+            {{- end }}
             - name: RUST_LOG
               value: {{ .Values.logLevel | quote }}
           resources:

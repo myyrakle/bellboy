@@ -2,7 +2,7 @@
 
 image:
   repository: myyrakle/bellboy
-  tag: v0.1.0
+  tag: v0.2.0
   pullPolicy: IfNotPresent
 
 # Slack 설정
@@ -12,6 +12,9 @@ slack:
 
 # 언어 설정 (ko 또는 en)
 language: ko
+
+# Watch할 네임스페이스 (비워두면 모든 네임스페이스 감시)
+watchNamespace: ""
 
 # 로그 레벨
 logLevel: info
