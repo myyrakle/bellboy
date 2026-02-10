@@ -1,5 +1,7 @@
 # bellboy
 
+![](https://img.shields.io/badge/language-Rust-red) ![](https://img.shields.io/badge/version-0.2.0-brightgreen) [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/myyrakle/bellboy/blob/master/LICENSE)
+
 - A fast and simple deployment notification system
 - Automatically sends Deployment completion notifications and Scale adjustment notifications to Slack.
 
@@ -29,28 +31,30 @@ helm install bellboy bellboy/bellboy --set slack.token="SLACK TOKEN" --set slack
 ### Examples
 
 Watch all namespaces:
+
 ```bash
 helm install bellboy bellboy/bellboy \
   --set slack.token="xoxb-..." \
-  --set slack.channel="C05Q0DSCT0A"
+  --set slack.channel="C...."
 ```
 
 Watch specific namespace only:
+
 ```bash
 helm install bellboy bellboy/bellboy \
   --set slack.token="xoxb-..." \
-  --set slack.channel="C05Q0DSCT0A" \
+  --set slack.channel="C...." \
   --set watchNamespace="production"
 ```
 
 Use English language:
+
 ```bash
 helm install bellboy bellboy/bellboy \
   --set slack.token="xoxb-..." \
-  --set slack.channel="C05Q0DSCT0A" \
+  --set slack.channel="C...." \
   --set language="en"
 ```
 
 Then, whenever the Deployment changes, a message like the following will be sent:
 <img width="485" height="214" alt="image" src="https://github.com/user-attachments/assets/6a50573c-3270-4096-9b41-d446405b5297" />
-
