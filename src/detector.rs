@@ -8,12 +8,15 @@ pub enum DeploymentEvent {
         name: String,
         old_generation: i64,
         new_generation: i64,
+        old_replicas: Option<i32>,
+        new_replicas: Option<i32>,
     },
     DeploymentCompleted {
         namespace: String,
         name: String,
         generation: i64,
         replicas: i32,
+        replica_changed: Option<(i32, i32)>, // (old, new)
     },
     ReplicaScaleStarted {
         namespace: String,
@@ -65,47 +68,48 @@ pub async fn detect_changes(
             current.last_scaled_replicas = current.replicas;
         }
         Some(prev) => {
-            // replica 변경 여부 확인
+            // 변경 여부 확인
             let is_replica_change = current.replicas != prev.replicas;
-            // 스케일링 진행 중인지 확인 (아직 완료되지 않은 replica 변경)
-            let is_scaling_in_progress = current.replicas != current.last_scaled_replicas;
+            let is_generation_change = current.generation > prev.generation;
+            let is_pod_template_change = current.pod_template_hash != prev.pod_template_hash;
 
             // 1. Deployment spec 변경 감지 (generation 증가)
-            if current.generation > prev.generation {
-                if is_replica_change {
-                    // replica 변경과 함께 generation 증가 → 스케일 이벤트로만 처리
-                    // generation은 증가했지만 배포 이벤트는 발생시키지 않으므로
-                    // 이 generation을 "완료된 것"으로 표시하여 배포 완료 알림 방지
-                    current.last_completed_generation = current.generation;
-                } else {
-                    // replica 변경 없이 generation 증가 → 배포 이벤트
+            if is_generation_change {
+                // Pod template이 변경되었으면 배포 이벤트, 아니면 replica 이벤트
+                if is_pod_template_change {
+                    // Pod template 변경 (이미지, 환경변수, 리소스 등) -> 배포 이벤트
+                    let (old_replicas, new_replicas) = if is_replica_change {
+                        (Some(prev.replicas), Some(current.replicas))
+                    } else {
+                        (None, None)
+                    };
+
                     events.push(DeploymentEvent::DeploymentStarted {
                         namespace: namespace.clone(),
                         name: name.clone(),
                         old_generation: prev.generation,
                         new_generation: current.generation,
+                        old_replicas,
+                        new_replicas,
                     });
+
+                    // replica 변경도 배포와 함께 처리됨
+                    if is_replica_change {
+                        current.last_scaled_replicas = current.replicas;
+                    }
+                } else {
+                    // Pod template 동일하고 replica만 변경 -> replica 이벤트
+                    events.push(DeploymentEvent::ReplicaScaleStarted {
+                        namespace: namespace.clone(),
+                        name: name.clone(),
+                        old_replicas: prev.replicas,
+                        new_replicas: current.replicas,
+                    });
+                    // replica만 변경된 경우 배포 완료 알림이 가지 않도록 generation 기록
+                    current.last_completed_generation = current.generation;
                 }
-            }
-
-            // 2. Deployment 완료 확인
-            // 스케일링이 진행 중이 아니고, 아직 완료 이벤트를 발생시키지 않은 경우만
-            if is_deployment_complete(&current)
-                && current.generation > current.last_completed_generation
-                && !is_scaling_in_progress
-            {
-                events.push(DeploymentEvent::DeploymentCompleted {
-                    namespace: namespace.clone(),
-                    name: name.clone(),
-                    generation: current.generation,
-                    replicas: current.replicas,
-                });
-                // 완료된 generation 기록
-                current.last_completed_generation = current.generation;
-            }
-
-            // 3. Replica 수 변경 감지
-            if is_replica_change {
+            } else if is_replica_change {
+                // generation 변경 없이 replica만 변경 (이런 경우는 거의 없음)
                 events.push(DeploymentEvent::ReplicaScaleStarted {
                     namespace: namespace.clone(),
                     name: name.clone(),
@@ -114,12 +118,33 @@ pub async fn detect_changes(
                 });
             }
 
-            // 4. Replica 변경 완료 확인
-            // 이 replicas 수에 대해 아직 완료 이벤트를 발생시키지 않았고,
-            // 모든 pods가 준비되었고, 배포가 진행 중이 아닌 경우
+            // 2. Deployment 완료 확인
+            if is_deployment_complete(&current)
+                && current.generation > current.last_completed_generation
+            {
+                // 배포 시작 시 replica가 변경되었는지 확인
+                let replica_changed = if is_generation_change && is_replica_change {
+                    Some((prev.replicas, current.replicas))
+                } else {
+                    None
+                };
+
+                events.push(DeploymentEvent::DeploymentCompleted {
+                    namespace: namespace.clone(),
+                    name: name.clone(),
+                    generation: current.generation,
+                    replicas: current.replicas,
+                    replica_changed,
+                });
+                // 완료된 generation 기록
+                current.last_completed_generation = current.generation;
+            }
+
+            // 3. Replica 변경 완료 확인
             if current.replicas != current.last_scaled_replicas
                 && is_replicas_ready(&current)
                 && current.observed_generation == current.generation
+                && current.generation == current.last_completed_generation // 배포가 아닌 경우만
             {
                 events.push(DeploymentEvent::ReplicaScaleCompleted {
                     namespace: namespace.clone(),
@@ -154,6 +179,11 @@ fn extract_deployment_state(deployment: &Deployment) -> DeploymentState {
     let spec = deployment.spec.as_ref();
     let status = deployment.status.as_ref();
 
+    // Pod template을 JSON으로 직렬화하여 해시 생성
+    let pod_template_hash = spec
+        .and_then(|s| serde_json::to_string(&s.template).ok())
+        .unwrap_or_default();
+
     DeploymentState {
         namespace: metadata.namespace.clone().unwrap_or_default(),
         name: metadata.name.clone().unwrap_or_default(),
@@ -163,6 +193,7 @@ fn extract_deployment_state(deployment: &Deployment) -> DeploymentState {
         available_replicas: status.and_then(|s| s.available_replicas).unwrap_or(0),
         updated_replicas: status.and_then(|s| s.updated_replicas).unwrap_or(0),
         observed_generation: status.and_then(|s| s.observed_generation).unwrap_or(0),
+        pod_template_hash,
         last_completed_generation: 0, // 초기값, detect_changes에서 업데이트
         last_scaled_replicas: 0,      // 초기값, detect_changes에서 업데이트
     }

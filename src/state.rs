@@ -14,6 +14,7 @@ pub struct DeploymentState {
     pub available_replicas: i32,
     pub updated_replicas: i32,
     pub observed_generation: i64,
+    pub pod_template_hash: String,      // Pod template 전체 해시 (구분용)
     pub last_completed_generation: i64, // 마지막으로 완료 이벤트를 발생시킨 generation
     pub last_scaled_replicas: i32,      // 마지막으로 스케일 완료 이벤트를 발생시킨 replicas
 }
